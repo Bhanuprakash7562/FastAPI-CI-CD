@@ -1,0 +1,90 @@
+1. What is Gitlab CI/CD?
+a. - GitLab Strives to become a complete DevOps platform.
+   - A platform which you can build your complete workflow
+   - CI = Continuous Integration, CD = Continuous deployment (or) Continuous Delivery.
+   - CI/CD will be helpful in Automatically and Continuously Deploying the project in any environment.
+   - WORKFLOW:
+	Code Changes --> Testing --> Build & Package --> Pushed to private container registry --> Release
+   - this pipeline code will be written in the form of jobs in ".gitlab-ci.yml" file and stored in the GitLab server(repository). which will be automatically detected and executed by GitLab runners.
+
+2. Gitlab Architechture.
+a. 1 - Gitlab Server or Instance: Hosts your applicatio code and pipeline configuration and manages the pipeline executions, which means the execution of pipeline jobs defined in configurations file will be managed by gilab server.
+   2 - Gitlab runners: Gitlab runner are connected to gitlab server, these are the execution environments/Agents for running the pipeline jobs.
+
+3. Pipeline Configuration file.
+a. - Gitlab CICD pipeline Script: A file need to be created called ".gitlab-ci.yml" which will be automatically detected and executed by GitLab server and gitlab runners.
+   - For setting up the pipeline, the whole pipeline is written in code and hosted in git repository. the whole CI/CD configuration is written in yaml format.
+
+4. where and which environment is the job executed?
+a. - By default the gitlab runners are installed in the shell of the server, So the commands are executed directly on the OS.
+   - But the common execution environment on gitlab is docker container. only docker itself need to be installed, each jobs runs inside a seperate isolated container.
+   - the gitlab runners use the docker containers as the execution environment. By default gitlab managed runners uses the ruby image which is not compactable with python application. So we need to explicitly define the python image in the configuration file In order to execute the jobs.
+   - we can specify which image need to be used to each job. as mentioned above by default the ruby image will be used.
+
+5. keywords.
+a. - image
+   - services
+   - stages
+   - types
+   - before_script
+   - after_script
+   - variables
+   - cache
+   - include
+   - true
+   - false
+   - nil
+
+6. what is stage?
+a. - multiple jobs in the same stage are executed at the same time.
+   - In our case we need to execute the jobs in order. Only if tests are successful, we want to build the docker image. Only if build and push is successful, we want to deploy it in development/production environment.
+        Changes --> Testing --> Build & Package --> Pushed to private container registry --> Release.
+   - To make this possible we need to define stages and jobs in order.
+   - You can group multiple jobs into stages that in a defined order.
+   - multiple jobs in the same stage are executed in parallel.
+
+
+5. Syntax for writing Pipeline code as jobs.
+# You can define any arbitary names for jobs excluding few keywords, and it need to follow indentation.
+# a job must contain "script" clause, script specifies the commands that need to be executed.
+
+variables:
+  - IMAGE_NAME : bhanuprakash7562/fastApi-app
+  - IMAGE_TAG : version1
+
+stages:
+  - tests
+  - build
+  - deploy
+
+test_code_job:
+  stage: tests
+  image: python:3.12-slim 
+  before_script:
+	- apt get update && apt get install make
+  script: 
+	- make test #execute-script-for-job1
+
+Build_image:
+  stage: build
+  image: docker:29.2.0-rc.1-cli --> docker client
+  services:
+	- docker:29.2.0-rc.1-dind --> docker daemon
+  variables:
+	- DOCKER_TLS_CRTDIR: "/certs" 
+  before_script:
+	- docker login -u $REGISTRY_USER -p $REGISTRY_PASS #-------------- private data like user creds can be defined as private variables in gitlab repository settings. public variables can be defined at job level.
+  script:
+	- docker build -t $IMAGE_NAME:$IMAGE_TAG . #execute-script-for-job2
+	- docker push $IMAGE_NAME:$IMAGE_TAG
+
+deploy_image:
+  stage: deploy
+  before_script:
+    - chmod 400 $SSH_KEY
+  script:
+    - ssh -o StrictHostKeyChecking=no $SSH_KEY ubuntu@0.0.0.0 "
+        docker login -u $REGISTRY_USER -p $REGISTRY_PASS &&
+        docker ps -aq | xargs docker stop | xargs docker rm &&
+        docker run -d -p 7562:8000 $IMAGE_NAME:$IMAGE_TAG
+    "

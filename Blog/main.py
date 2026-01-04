@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from datetime import datetime
+import uvicorn
 from . import database, schemas, models
 from passlib.context import CryptContext
 from .routers import blog, user, login
@@ -84,3 +85,6 @@ app.include_router(login.router)
 #         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="row not found")
 #     print(result)
 #     return [dict(row._mapping) for row in result]
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

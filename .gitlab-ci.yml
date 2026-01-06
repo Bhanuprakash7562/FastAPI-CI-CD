@@ -55,3 +55,9 @@ deploy_image:
         sudo docker compose pull &&
         sudo docker compose down &&
         sudo docker compose up -d --remove-orphans"
+    # Steps to setup in ec2 instance:
+        # - update ip in pipeline code.
+        # - create public and private key pairs in your local system for CI/CD and add the rsa public key to the ec2 instance.
+        # - add the private key as a variable in gitlab cicd settings, and use the key for making SSH remote connection.
+        # - install docker, docker-compose, buildx.
+        # - clone this git repository.

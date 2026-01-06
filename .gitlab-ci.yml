@@ -1,0 +1,57 @@
+variables:
+  IMAGE_NAME: "bhanuprakash7562/fastapi-app"
+  IMAGE_TAG: "version1"
+
+stages:
+  - tests
+  - build
+  - deploy
+
+test_code_job:
+  stage: tests
+  image: python:3.12-slim
+  services:
+    - name: postgres:16
+      alias: postgres
+  variables:
+    POSTGRES_DB: test_db
+    POSTGRES_USER: test_user
+    POSTGRES_PASSWORD: test_pass
+    DATABASE_URL: postgresql+psycopg2://test_user:test_pass@postgres:5432/test_db
+    ENV: test
+  before_script:
+    - apt-get update
+    - apt-get install -y gcc libpq-dev
+  script:
+    - python -m venv venv
+    - . venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+    - pytest -v
+
+Build_image:
+  stage: build
+  image: docker:29.2.0-rc.1-cli
+  services:
+    - docker:29.2.0-rc.1-dind
+  variables:
+    DOCKER_TLS_CRTDIR: "/certs"
+  before_script:
+    - docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"
+  script:
+    - docker build -t "$IMAGE_NAME:$IMAGE_TAG" .
+    - docker push "$IMAGE_NAME:$IMAGE_TAG"
+
+deploy_image:
+  stage: deploy
+  before_script:
+    - chmod 400 $SSH_KEY
+  
+  script:
+    - ssh -o StrictHostKeyChecking=no -i $SSH_KEY ec2-user@13.235.78.100 "
+        cd /home/ec2-user/fastAPI-project/FastAPI-CI-CD &&
+        git pull origin main &&
+        sudo docker login -u $REGISTRY_USER -p $REGISTRY_PASS &&
+        sudo docker compose pull &&
+        sudo docker compose down &&
+        sudo docker compose up -d --remove-orphans"
